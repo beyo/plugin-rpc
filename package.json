@@ -1,0 +1,27 @@
+{
+  "name": "beyo-plugin-rpc",
+  "version": "0.0.1",
+  "description": "Bi-directional RPC plugin for Beyo framework",
+  "main": "lib/index.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/beyo/plugin-rpc.git"
+  },
+  "keywords": [
+    "rpc",
+    "beyo"
+  ],
+  "author": "Yanick Rochon <yanick.rochon@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/beyo/plugin-rpc/issues"
+  },
+  "homepage": "https://github.com/beyo/plugin-rpc#readme",
+  "devDependencies": {
+    "istanbul": "^0.3.22",
+    "mocha": "^2.3.3"
+  }
+}
