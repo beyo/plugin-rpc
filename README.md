@@ -65,7 +65,53 @@ require(['beyo-plugin-rpc'], function (rpc) {
 **NOTE**: The client library uses [Primus](https://github.com/primus/primus) to communicate with the server. However, at the moment, there is no way to setup primus.
 
 
+## Configuration
+
+* **port** : *{number}* - *(required)* the port to which the server will listen to for incoming connections
+* **clientURL** : *{string}* - the URL that the client will connect to to get the library. If not specified, then no client code will be served.
+* **clientCacheExpire** : *{string}* - 
+* **ownerProvider** : *{function|string}* - how message and response owners are generated for clients. If a function, it will receive the HTTP request context object and should return an identifier or a `Promise` resolving to an identifier. If a string, it should represent a property path from the HTTP request context. If not specified, a unique hash value will be generated and returned.
+  
+  Example:
+  ```
+  {
+    "ownerProvider": "passport.user.id"
+  }
+  ```
+
+  ```
+  {
+    "ownerProvider": function (ctx) {
+      return ctx.passport.user.id;
+    }
+  }
+  ```
+
+
 ### API
+
+* **rpc.emit(message)** : *(Promise)* - emit a given message end returning a `Promise` resolving with the given values, or rejecting with the given `Error`.
+
+  ```
+  var message = new rpc.Message('foo.bar', {
+    greeting: 'World'
+  });
+  rpc.emit(message).then(function (responses) {
+    responses.forEach(function (response) {
+      if (response.success) {
+        console.log('RPC response from', response.owner || 'guest', 'is', response.value);
+      } else {
+        console.log('RPC failed from', response.owner || 'guest', 'with error', response.error);
+      }
+    });
+  }).catch(function (err) {
+    console.error(err.message);
+  })
+  ```
+
+  **NOTE**: on the client side, jQuery's promise implementation is used. Until version 3.0 of jQuery, the client-side promises will be "thenable", and not Promise/A+ compatible.
+
+* *(server)* **rpc.library(ctx)** : *{function}* - return the client library as string. The argument `ctx` should be an active application HTTP request context. This function will generate a client library specified to the requesting client. Therefore, it's returned value must be cached globally.
 
 * **rpc.on(name, callback)** or **rpc.on(obj)** : *(boolean)* - register a new message handler. The `name` is an arbitrary string value. If an `object` is passed, then it's nested keys will be used as names. The `callback` argument, or `obj` values, should be functions receiving a `Message` object and returning or a value (sync), or a `Promise` (async).
  
@@ -92,33 +138,9 @@ require(['beyo-plugin-rpc'], function (rpc) {
 
 * **rpc.removeAll()** : *{boolean}* - unregister all message handlers.
 
-* **rpc.emit(message)** : *(Promise)* - emit a given message end returning a `Promise` resolving with the given values, or rejecting with the given `Error`.
-
-  ```
-  var message = new rpc.Message('foo.bar', {
-    greeting: 'World'
-  });
-  rpc.emit(message).then(function (responses) {
-    responses.forEach(function (response) {
-      if (response.success) {
-        console.log('RPC response from', response.owner || 'guest', 'is', response.value);
-      } else {
-        console.log('RPC failed from', response.owner || 'guest', 'with error', response.error);
-      }
-    });
-  }).catch(function (err) {
-    console.error(err.message);
-  })
-  ```
-
-  **NOTE**: on the client side, jQuery's promise implementation is used. Until version 3.0 of jQuery, the client-side promises will be "thenable", and not Promise/A+ compatible.
-
-* **rpc.Message** : *{function}* - `Message` constructor function.
-
 
 ### API : Message
 
-* *new* **Message(name[, data[, target ]])** : *{Message}* - return a new instance
 * **message.name** : *(string}* - the message name
 * **message.owner** : *{number|string}* - the message owner (user id), or `"server"`, or `null` if anonymous.
 * **message.target** : *{number|string|array}* - the target owners to send this message to. If an array, try to contact all the specified owners. If `null`, broadcast to all message listeners.

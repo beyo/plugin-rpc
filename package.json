@@ -2,7 +2,7 @@
   "name": "beyo-plugin-rpc",
   "version": "0.0.1",
   "description": "Bi-directional RPC plugin for Beyo framework",
-  "main": "lib/index.js",
+  "main": "index.js",
   "scripts": {
     "test": "mocha"
   },
