@@ -121,6 +121,7 @@ require(['beyo-plugin-rpc'], function (rpc) {
 * *new* **Message(name, data)** : *{Message}* - return a new instance
 * **message.name** : *(string}* - the message name
 * **message.owner** : *{number|string}* - the message owner (user id), or `"server"`, or `null` if anonymous.
+* **message.target** : *{number|string|array}* - the target owners to send this message to. If an array, try to contact all the specified owners. If `null`, broadcast to all message listeners.
 * **message.data** : *{object}* - the message data
 * **message.timestamp** : *{number}* - the UNIX timestamp of the message
 
