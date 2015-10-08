@@ -8,7 +8,7 @@ Bi-directional RPC plugin for Beyo applications
 In your application :
 
 ```
-npm install beyo-plugin-rpg --save
+npm install beyo-plugin-rpc --save
 ```
 
 Then add the plugin configuration to your app `conf` :
@@ -62,30 +62,76 @@ require(['beyo-plugin-rpc'], function (rpc) {
 });
 ```
 
-**NOTE**: The client library uses [Primus](https://github.com/primus/primus) to communicate with the server.
+**NOTE**: The client library uses [Primus](https://github.com/primus/primus) to communicate with the server. However, at the moment, there is no way to setup primus.
 
 
 ### API
 
-* **register(name, callback)** : *(boolean)* - register a new handler. The `name` is an arbitrary string value. The `callback` argument should be a function returning a value (sync), or a `Promise` (async).
+* **rpc.on(name, callback)** or **rpc.on(obj)** : *(boolean)* - register a new message handler. The `name` is an arbitrary string value. If an `object` is passed, then it's nested keys will be used as names. The `callback` argument, or `obj` values, should be functions receiving a `Message` object and returning or a value (sync), or a `Promise` (async).
  
   ```
-  rpc.register('foo.bar', function (text) {
-    return 'Hello ' + text;
+  rpc.on('foo.bar', function (msg) {
+    return 'Hello ' + msg.data.greeting;
+  });
+
+  // is te same as
+  rpc.on({
+    'foo': {
+      'bar': function (msg) { 
+        return 'Hello ' + msg.data.greeting;
+      }
+    }
   });
   ```
 
-* **invoke(name, [arguments, ...])** : *(Promise)* - invoke a given handler on the other end returning a `Promise` resolving with the given value, or rejecting with the given `Error`.
+  **NOTE**: each instance of the RPC library (either server or client) may only register one message handler per name. Trying to register an handler on top of an existing one will return `false`. For example, the server and client may both register the same name, but the same name cannot be registered twice on the same server or client.
+
+  **NOTE**: if executed as is, the code above would return false for the second call, as `foo.bar` is already registered using the `name` variation.
+
+* **rpc.remove(name)** or **rpc.remove(obj)** : *{boolean}* - unregister the specified message handler. If an object is passed, then remove all the nested keys and return `true` if at least message handler key was removed.
+
+* **rpc.removeAll()** : *{boolean}* - unregister all message handlers.
+
+* **rpc.emit(message)** : *(Promise)* - emit a given message end returning a `Promise` resolving with the given values, or rejecting with the given `Error`.
 
   ```
-  rpc.invoke('foo.bar', 'World').then(function (value) {
-    console.log("RPC response:", value);
+  var message = new rpc.Message('foo.bar', {
+    greeting: 'World'
+  });
+  rpc.emit(message).then(function (responses) {
+    responses.forEach(function (response) {
+      if (response.success) {
+        console.log('RPC response from', response.owner || 'guest', 'is', response.value);
+      } else {
+        console.log('RPC failed from', response.owner || 'guest', 'with error', response.error);
+      }
+    });
   }).catch(function (err) {
     console.error(err.message);
   })
   ```
 
   **NOTE**: on the client side, jQuery's promise implementation is used. Until version 3.0 of jQuery, the client-side promises will be "thenable", and not Promise/A+ compatible.
+
+* **rpc.Message** : *{function}* - `Message` constructor function.
+
+
+### API : Message
+
+* *new* **Message(name, data)** : *{Message}* - return a new instance
+* **message.name** : *(string}* - the message name
+* **message.owner** : *{number|string}* - the message owner (user id), or `"server"`, or `null` if anonymous.
+* **message.data** : *{object}* - the message data
+* **message.timestamp** : *{number}* - the UNIX timestamp of the message
+
+
+### API : Response
+
+* **response.success** : *{boolean}* - the response has a value or an error
+* **response.owner** : *{number|string}* - the response owner (user id), or `"server"`, or `null` if anonymous.
+* **response.value** : *{object}* - the response value, what the message handler resolved to or returned, or `null`.
+* **response.error** : *{Error}* - an `Error` object if `response.success === false`, or `null`
+* **response.timestamp** : *{number}* - the UNIX timestamp of the response
 
 
 ## Contribution
