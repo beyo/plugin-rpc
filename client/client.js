@@ -49,12 +49,12 @@
 
   function registerHandler(name, handler) {
     if (!handlers[name]) {
-      console.warn('Trying to override message handler', name);
-
       handlers[name] = handler;
 
       return true;
     } else {
+      console.warn('Trying to override message handler', name);
+
       return false;
     }
   }
@@ -91,6 +91,15 @@
 
 
   function buildEnveloppe(message, type, id) {
+    'use strict';
+
+    if (!(message && message.name && typeof message.name === 'string')) {
+      throw new Error('Invalid message', message);
+    }
+
+    message.owner = MESSAGE_OWNER;  // override
+    message.timestamp = message.timestamp || new Date().getTime();
+
     return {
       id: id || generateUId(),
       type: type || ENVELOPPE_TYPE_REQUEST,
@@ -99,12 +108,69 @@
   }
 
 
+  function handleRequest(id, message) {
+    var handler;
+    var value;
+
+    if (!handlers[message.name]) {
+      return;
+    }
+
+    function _buildResponseMessage(err, value) {
+      return buildEnveloppe({
+        success: !err,
+        error: err,
+        value: value
+      });
+    }
+
+    handler = handlers[message.name];
+
+    value = handler(message);
+
+    // FIXME: change this when jQuery 3.0 is out
+    if (value.done && value.fail) {
+      value.done(function (value) {
+        primus.write(_buildResponseMessage(null, value));
+      }).fail(function (err) {
+        primus.write(_buildResponseMessage(err, null));
+      });
+    } else {
+      primus.write(_buildResponseMessage(null, value));
+    }
+  }
+
+
+  function handleResponse(id, message) {
+    if (pending[id]) {
+      var p = pending[id];
+
+      delete pending[id];
+
+      if (message.error) {
+        p.deferred.reject(message);
+      } else {
+        p.deferred.resolve(message);
+      }
+    }
+  }
+
+
   // public
 
 
   function emitMessage(message) {
-    var enveloppe = buildEnveloppe(message);
-    var def = $.Deferred();
+    var enveloppe;
+    var def;
+
+    if (!isConnected) {
+      throw new Error('Not connected to RPC server!');
+    }
+
+
+    enveloppe = buildEnveloppe(message);
+    // FIXME: change this when jQuery 3.0 is out
+    def = $.Deferred();
 
     pending[enveloppe.id] = {
       deferred: def,
@@ -146,23 +212,6 @@
   function removeAllListeners() {
     handlers = {};
   }
-    
-
-  function Message(name, data, target) {
-    this.name = name;
-    this.owner = MESSAGE_OWNER;
-    this.data = data;
-    this.target = target;
-  }
-
-
-  function Response(response) {
-    this.success = !!response.success;
-    this.owner = response.owner || null;
-    this.value = response.value || null;
-    this.error = response.error || null;
-    this.timestamp = response.timestamp || new Date().getTime();
-  }
 
 
   // primus
@@ -177,20 +226,15 @@
 
   primus.on('data', function (enveloppe) {
     if (enveloppe.type === ENVELOPPE_TYPE_REQUEST) {
-      if (handlers[enveloppe.message.name]) {
-
-      }
+      handleRequest(enveloppe.id, enveloppe.message);
     } else if (enveloppe.type === ENVELOPPE_TYPE_RESPONSE) {
-
+      handleResponse(enveloppe.id, enveloppe.message);
     }
-    
   });
 
   primus.on('end', function () {
     isConnected = false;
   });
-
-
 
   return {
     emit: emitMessage,
