@@ -1,11 +1,24 @@
 
 var crypto = require ("crypto")
 
+var browserify = require('browserify');
+var esmangleify = require('esmangleify');
+
 var RPC = require('./lib/rpc');
 var clientLibrary = require('./lib/client-library');
 
 
 var rpc;
+
+
+var b = browserify({
+  standalone: 'beyo.plugins.rpc'
+});
+b.transform(esmangleify());
+b.add('./lib/message.js');
+b.add('./lib/response.js');
+b.bundle().pipe(process.stdout);
+
 
 
 module.exports = rpcPlugin;
@@ -47,7 +60,7 @@ function middlewareWrapper(beyo, config) {
       } else {
         yield next;
       }
-    });
+    };
   };
 }
 
