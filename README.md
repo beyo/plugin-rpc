@@ -19,8 +19,15 @@ Then add the plugin configuration to your app `conf` :
   "rpc": {
     "module": "beyo-plugin-rpc",
     "options": {
-        "port": 6000,
-        "clientURL": "/rpc/client.js"
+      "serverOptions": {
+        "port": 4088,
+        "transformer": "websockets"
+      },
+      "clientOptions": {
+        "ownerProvider": "req.passport.user.id",
+        "interface": "eth0",
+        "url": "/rpc/client.js"
+      }
     }
   }
 }

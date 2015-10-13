@@ -1,32 +1,24 @@
 
 var crypto = require("crypto")
 
-var RPC = require('./lib/rpc');
-var clientLibrary = require('./lib/client-library');
+var browserify = require('browserify');
+var esmangleify = require('esmangleify');
 
+var RPCServer = require('./lib/rpc-server');
 
 var rpc;
-
-
-rpc = new RPC();
-console.log(rpc.clientConnection);
 
 
 module.exports = rpcPlugin;
 
 
-function rpcPlugin(beyo) {
-  var config = beyo.config('plugins.rpc', {});
-
+function * rpcPlugin(beyo, options) {
   if (rpc) {
-    throw new Error('Plugin already initialized!');
-  } else if (!config.port) {
-    throw new Error('Configuration missing: port');
+    return rpc;
   }
 
-  rpc = new RPC(config);
-
-  rpc.middleware = middlewareWrapper(beyo, config);
+  rpc = new RPCServer(options);
+  rpc.middleware = middlewareWrapper(beyo, options.clientOptions);
 
   return rpc;
 }
@@ -44,7 +36,7 @@ function middlewareWrapper(beyo, config) {
     return function * (next) {
       var id;
 
-      if (config.clientURL && (this.url === config.clientURL)) {
+      if (config.url && (this.url === config.url)) {
         id = yield ownerProvider(this);
 
         this.body = yield* clientLibrary(id, this);
@@ -68,7 +60,7 @@ function propertyOwnerProvider(property) {
       if (ctx !== undefined) {
         cb(null, ctx);
       } else {
-        cb(new Error('Invalid owner property `' + property + '` for RPC client library'));
+        cb("anonymous");
       }
     };
   };
@@ -79,4 +71,9 @@ function defaultOwnerProvider() {
   return function (cb) {
     crypto.randomBytes(256, cb);
   };
+}
+
+
+function * clientLibrary(id, ctx) {
+  return 'alert("OK");';
 }
