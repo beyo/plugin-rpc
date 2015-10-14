@@ -75,5 +75,16 @@ function defaultOwnerProvider() {
 
 
 function * clientLibrary(id, ctx) {
-  return 'alert("OK");';
+  var b = browserify();
+  var buffer = '';
+
+  return function (done) {
+
+    b.add('./rpc-client');
+    b.bundle().on('data', function (data) {
+      buffer = buffer + data.toString();
+    }).on('end', function () {
+      done(null, buffer);
+    });
+  };
 }
