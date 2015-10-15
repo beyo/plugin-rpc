@@ -12,6 +12,8 @@ var escodegen = require('esmangleify/node_modules/browserify-esprima-tools/node_
 var esmangle = require('esmangleify/node_modules/esmangle/lib/esmangle');
 
 var RPCServer = require('./lib/rpc-server');
+var Message = require('./lib/message');
+var config = require('./lib/config');
 
 var rpc;
 var libraryTemplate;
@@ -28,7 +30,15 @@ function * rpcPlugin(beyo, options) {
   options = options || {};
 
   rpc = new RPCServer(options);
+  rpc.Message = Message;
   rpc.middleware = middlewareWrapper(beyo, options.clientOptions);
+  rpc.library = function * getLibrary(id) {
+    if (!id) {
+      id = yield defaultOwnerProvider();
+    }
+
+    return yield clientLibrary(id, options.clientOptions || {});
+  };
 
   return rpc;
 }
@@ -74,7 +84,7 @@ function propertyOwnerProvider(property) {
       if (ctx !== undefined) {
         cb(null, ctx);
       } else {
-        cb(null, "anonymous");
+        cb(null, config.guest);
       }
     };
   };
@@ -103,17 +113,17 @@ function clientLibrary(id, options) {
         basedir: path.join(__dirname, 'lib'),
         standalone: 'beyo.plugins.rpc'
       });
-      var buffer = getPrimusLibrary(false) + '\n// ============= RPC =============\n';
+      var buffer = getPrimusLibrary(true) + '\n// ============= RPC =============\n';
 
       b.transform(browserifyReplace, {
         'replace': [{
           'from': LIBRARY_PATTERN_TOKENS,
           'to': function (match, token, old) {
-            return 'beyo.plugins.rpc.config["' + token + '"]';
+            return 'rpcConfig["' + token + '"]';
           }
         }]
       });
-      //b.transform(esmangleify());
+      b.transform(esmangleify());
       b.add('./rpc-client');
 
       b.bundle().on('data', function (data) {
@@ -161,11 +171,7 @@ function getPrimusLibrary(optimize) {
 function configClientLibrary(id, options) {
   var pre = '\n// ============= Config =============\n'
           //+ 'var exports,module,define;'
-          + 'var beyo=window.beyo||{};'
-          + 'beyo.plugins=beyo.plugins||{};'
-          + 'beyo.plugins=beyo.plugins||{};'
-          + 'beyo.plugins.rpc=beyo.plugins.rpc||{};'
-          + 'beyo.plugins.rpc.config=' + JSON.stringify({
+          + 'var rpcConfig=' + JSON.stringify({
               'owner': id,
               'primus-url': rpc.clientConnection.url,
               'primus-options': options.primusOptions || {}

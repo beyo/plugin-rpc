@@ -29,6 +29,7 @@
     "browserify-replace": "^0.9.0",
     "esmangleify": "^1.1.4",
     "primus": "^4.0.0",
+    "promise-events": "0.0.5",
     "ws": "^0.8.0"
   }
 }

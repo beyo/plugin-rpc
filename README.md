@@ -20,12 +20,12 @@ Then add the plugin configuration to your app `conf` :
     "module": "beyo-plugin-rpc",
     "options": {
       "serverOptions": {
-        "port": 4088,
+        "iknowhttpsisbetter": true,
+        "port": 4046,
         "transformer": "websockets"
       },
       "clientOptions": {
-        "ownerProvider": "req.passport.user.id",
-        "interface": "eth0",
+        "ownerProvider": "passport.user.id",
         "url": "/rpc/client.js"
       }
     }
@@ -64,7 +64,7 @@ The interface is recommended to be obtained globally or through `require` (i.e. 
 or with a loader (ex: RequireJS) :
 
 ```
-require(['beyo-plugin-rpc'], function (rpc) {
+require(['rpc/client'], function (rpc) {
   // ...
 });
 ```
@@ -74,10 +74,9 @@ require(['beyo-plugin-rpc'], function (rpc) {
 
 ## Configuration
 
-* **port** : *{number}* - *(required)* the port to which the server will listen to for incoming connections
-* **clientURL** : *{string}* - the URL that the client will connect to to get the library. If not specified, then no client code will be served.
-* **clientCacheExpire** : *{string}* - 
-* **ownerProvider** : *{function|string}* - how message and response owners are generated for clients. If a function, it will receive the HTTP request context object and should return an identifier or a `Promise` resolving to an identifier. If a string, it should represent a property path from the HTTP request context. If not specified, a unique hash value will be generated and returned.
+* **serverOptions** : *{object}* - *(required)* an object that will be passed to the Primus constructor.
+* **clientOptions.url** : *{string}* - the URL that the client will connect to to get the library. If not specified, then no client code will be served.
+* **clientOptions.ownerProvider** : *{function|string}* - how message and response owners are generated for clients. If a function, it will receive the HTTP request context object and should return an identifier or a `Promise` resolving to an identifier. If a string, it should represent a property path from the HTTP request context. If not specified, a unique hash value will be generated and returned.
   
   Example:
   ```
@@ -97,7 +96,7 @@ require(['beyo-plugin-rpc'], function (rpc) {
 
 ### API
 
-* **rpc.emit(message)** : *(Promise)* - emit a given message end returning a `Promise` resolving with the given values, or rejecting with the given `Error`.
+* **rpc.emit(name, data, target)** or **rpc.emit(message)** : *(Promise)* - emit some `data` to the specified `name`d listeners, and return a `Promise` resolving with the given values, or rejecting with the given `Error`s. If `target` is specified, it is a string or array of strings, which will emit to these specified targets only. If target is not specified, it will be emitted to all server and clients.
 
   ```
   var message = new rpc.Message('foo.bar', {
@@ -118,9 +117,11 @@ require(['beyo-plugin-rpc'], function (rpc) {
 
   **NOTE**: on the client side, jQuery's promise implementation is used. Until version 3.0 of jQuery, the client-side promises will be "thenable", and not Promise/A+ compatible.
 
-* *(server)* **rpc.library(ctx)** : *{function}* - return the client library as string. The argument `ctx` should be an active application HTTP request context. This function will generate a client library specified to the requesting client. Therefore, it's returned value must be cached globally.
+* *(server)* **rpc.library(id)** : *{GeneratorFunction}* - resolve with the client library as string. The argument `id` should be an library's unique id when connecting to the server. This function will generate a personalized client library. Therefore, it's returned value must not be cached globally. The first time this function is called may require some time to process. However, any subsequent call returns almost immediately as the generic part of the library is cached internally (~30KB)
 
-* **rpc.on(name, callback)** or **rpc.on(obj)** : *(boolean)* - register a new message handler. The `name` is an arbitrary string value. If an `object` is passed, then it's nested keys will be used as names. The `callback` argument, or `obj` values, should be functions receiving a `Message` object and returning or a value (sync), or a `Promise` (async).
+* *(server)* **rpc.middleware()** : *{function}* - return a middleware to handle retrieving the client library from the configured url.
+
+* **rpc.on(name, callback)** or **rpc.on(obj)** : *(Promise)* - register a new message handler. The `name` is an arbitrary string value. If an `object` is passed, then it's nested keys will be used as names. The `callback` argument, or `obj` values, should be functions receiving a `Message` object and returning or a value (sync), or a `Promise` (async).
  
   ```
   rpc.on('foo.bar', function (msg) {
@@ -141,9 +142,9 @@ require(['beyo-plugin-rpc'], function (rpc) {
 
   **NOTE**: if executed as is, the code above would return false for the second call, as `foo.bar` is already registered using the `name` variation.
 
-* **rpc.remove(name)** or **rpc.remove(obj)** : *{boolean}* - unregister the specified message handler. If an object is passed, then remove all the nested keys and return `true` if at least message handler key was removed.
+* **rpc.remove(name)** or **rpc.remove(obj)** : *{Promise}* - unregister the specified message handler. If an object is passed, then remove all the nested keys and resolve to `true` if at least message handler key was removed.
 
-* **rpc.removeAll()** : *{boolean}* - unregister all message handlers.
+* **rpc.removeAll()** : *{Promise}* - unregister all message handlers.
 
 
 ### API : Message
