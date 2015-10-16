@@ -23,22 +23,20 @@ module.exports = rpcPlugin;
 
 
 function * rpcPlugin(beyo, options) {
-  if (rpc) {
-    return rpc;
+  if (!rpc) {
+    options = options || {};
+
+    rpc = new RPCServer(options);
+    rpc.Message = Message;
+    rpc.middleware = middlewareWrapper(beyo, options);
+    rpc.library = function * getLibrary(id) {
+      if (!id) {
+        id = yield defaultOwnerProvider();
+      }
+
+      return yield clientLibrary(id, options || {});
+    };
   }
-
-  options = options || {};
-
-  rpc = new RPCServer(options);
-  rpc.Message = Message;
-  rpc.middleware = middlewareWrapper(beyo, options.clientOptions);
-  rpc.library = function * getLibrary(id) {
-    if (!id) {
-      id = yield defaultOwnerProvider();
-    }
-
-    return yield clientLibrary(id, options.clientOptions || {});
-  };
 
   return rpc;
 }
@@ -60,7 +58,7 @@ function middlewareWrapper(beyo, config) {
     return function * (next) {
       var id;
 
-      if (config.url && (this.url === config.url)) {
+      if (config.url && (this.url === config.clientUrl)) {
         id = yield ownerProvider(this);
 
         this.body = yield clientLibrary(id, config);
@@ -113,7 +111,7 @@ function clientLibrary(id, options) {
         basedir: path.join(__dirname, 'lib'),
         standalone: 'beyo.plugins.rpc'
       });
-      var buffer = getPrimusLibrary(true) + '\n// ============= RPC =============\n';
+      var buffer = getPrimusLibrary();
 
       b.transform(browserifyReplace, {
         'replace': [{
@@ -123,13 +121,28 @@ function clientLibrary(id, options) {
           }
         }]
       });
-      b.transform(esmangleify());
+      //b.transform(esmangleify());
       b.add('./rpc-client');
 
       b.bundle().on('data', function (data) {
         buffer = buffer + data.toString();
       }).on('end', function () {
-        libraryTemplate = buffer;
+        var ast = esprima.parse(buffer);
+        // Get optimized AST
+        var optimized = esmangle.optimize(ast, null);
+        // gets mangled AST
+        var result = esmangle.mangle(optimized);
+        // get source back
+        libraryTemplate = escodegen.generate(result, {
+          format: {
+            renumber: true,
+            hexadecimal: true,
+            escapeless: true,
+            compact: true,
+            semicolons: false,
+            parentheses: false
+          }
+        });
 
         done(null, configClientLibrary(id, options));
       });
@@ -139,39 +152,15 @@ function clientLibrary(id, options) {
 
 
 function getPrimusLibrary(optimize) {
-  var buffer = rpc.primus.library();
-
-  if (optimize) {
-    var ast = esprima.parse(buffer);
-    // Get optimized AST
-    var optimized = esmangle.optimize(ast, null);
-    // gets mangled AST
-    var result = esmangle.mangle(optimized);
-    // get source back
-    buffer = escodegen.generate(result, {
-      format: {
-        renumber: true,
-        hexadecimal: true,
-        escapeless: true,
-        compact: true,
-        semicolons: false,
-        parentheses: false
-      }
-    });
-  }
-  
-  return '\n// ============= Primus =============\n' 
-       + '!function(module,exports,define){'
-       + buffer
-      + '}();'
+  return '!function(module,exports,define){'
+        + rpc.primus.library()
+        + '}();'
   ;
 }
 
 
 function configClientLibrary(id, options) {
-  var pre = '\n// ============= Config =============\n'
-          //+ 'var exports,module,define;'
-          + 'var rpcConfig=' + JSON.stringify({
+  var pre = 'var rpcConfig=' + JSON.stringify({
               'owner': id,
               'primus-url': rpc.clientConnection.url,
               'primus-options': options.primusOptions || {}

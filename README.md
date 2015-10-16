@@ -19,14 +19,13 @@ Then add the plugin configuration to your app `conf` :
   "rpc": {
     "module": "beyo-plugin-rpc",
     "options": {
-      "serverOptions": {
+      "primusOptions": {
         "iknowhttpsisbetter": true,
         "port": 4046,
         "transformer": "websockets"
       },
-      "clientOptions": {
-        "ownerProvider": "passport.user.id",
-        "url": "/rpc/client.js"
+      "ownerProvider": "passport.user.id",
+      "clientUrl": "/rpc/client.js"
       }
     }
   }
@@ -74,9 +73,11 @@ require(['rpc/client'], function (rpc) {
 
 ## Configuration
 
-* **serverOptions** : *{object}* - *(required)* an object that will be passed to the Primus constructor.
-* **clientOptions.url** : *{string}* - the URL that the client will connect to to get the library. If not specified, then no client code will be served.
-* **clientOptions.ownerProvider** : *{function|string}* - how message and response owners are generated for clients. If a function, it will receive the HTTP request context object and should return an identifier or a `Promise` resolving to an identifier. If a string, it should represent a property path from the HTTP request context. If not specified, a unique hash value will be generated and returned.
+* **primusOptions** : *{object}* - *(required)* an object that will be passed to the Primus constructor. (See [documentation](https://github.com/primus/primus).)
+* **interface** : *{string}* - the network interface to use (i.e. `'eth0'`)
+* **useIPv6** : *{boolean}* - when determining the network interface IP address, should the address be resolved as IPv6 (`true`) or IPv4 (`false`)
+* **clientUrl** : *{string}* - the URL that the client will connect to to get the library. If not specified, then no client code will be served.
+* **ownerProvider** : *{function|string}* - how message and response owners are generated for clients. If a function, it will receive the HTTP request context object and should return an identifier or a `Promise` resolving to an identifier. If a string, it should represent a property path from the HTTP request context. If not specified, a unique hash value will be generated and returned.
   
   Example:
   ```
