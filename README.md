@@ -152,19 +152,19 @@ require(['rpc/client'], function (rpc) {
   });
   ```
 
-  **NOTE**: each instance of the RPC library (either server or client) may only register one message handler per name. Trying to register an handler on top of an existing one will return `false`. For example, the server and client may both register the same name, but the same name cannot be registered twice on the same server or client.
+  **NOTE**: each instance of the RPC library (either server or client) may only register one message listener per name. Trying to register a listener on top of an existing one will return `false`. For example, the server and client may both register the same name, but the same name cannot be registered twice on the same server or client.
 
   **NOTE**: if executed as is, the code above would return false for the second call, as `foo.bar` is already registered using the `name` variation.
 
-* **rpc.remove(name)** or **rpc.remove(obj)** : *{Promise}* - unregister the specified message handler. If an object is passed, then remove all the nested keys and resolve to `true` if at least message handler key was removed.
+* **rpc.remove(action)** or **rpc.remove(obj)** : *{Promise}* - unregister the specified message listener. If an object is passed, then remove all the nested keys and resolve to `true` if at least message listener key was removed.
 
-* **rpc.removeAll()** : *{Promise}* - unregister all message handlers.
+* **rpc.removeAll()** : *{Promise}* - unregister all message listeners.
 
 
 ### API : Message
 
-* **message.name** : *(string}* - the message name
-* **message.owner** : *{number|string}* - the message owner (user id), or `"server"`, or `null` if anonymous.
+* **message.action** : *(string}* - the message action
+* **message.owner** : *{number|string}* - the message owner (ex: user id), or `"server"`, or `null` if anonymous.
 * **message.target** : *{number|string|array}* - the target owners to send this message to. If an array, try to contact all the specified owners. If `null`, broadcast to all message listeners.
 * **message.data** : *{object}* - the message data
 * **message.timestamp** : *{number}* - the UNIX timestamp of the message
@@ -173,8 +173,8 @@ require(['rpc/client'], function (rpc) {
 ### API : Response
 
 * **response.success** : *{boolean}* - the response has a value or an error
-* **response.owner** : *{number|string}* - the response owner (user id), or `"server"`, or `null` if anonymous.
-* **response.value** : *{object}* - the response value, what the message handler resolved to or returned, or `null`.
+* **response.owner** : *{number|string}* - the response owner (ex: user id), or `"server"`, or `null` if anonymous.
+* **response.value** : *{object}* - the response value, what the message listener resolved to or returned, or `null`.
 * **response.error** : *{Error}* - an `Error` object if `response.success === false`, or `null`
 * **response.timestamp** : *{number}* - the UNIX timestamp of the response
 
