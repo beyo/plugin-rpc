@@ -1,4 +1,5 @@
 
+const OPTIMIZE_CLIENT_LIBRARY = true;
 const LIBRARY_PATTERN_TOKENS = /\/\*+\{\{(.+?)\}\}\*+\/(.*?)\/\*+\{\{!\1\}\}\*+\//g;
 
 var path = require('path');
@@ -41,12 +42,12 @@ function * rpcPlugin(beyo, options) {
   return rpc;
 }
 
-function middlewareWrapper(beyo, config) {
+function middlewareWrapper(beyo, options) {
   var ownerProvider;
 
-  config = config || {};
+  options = options || {};
 
-  ownerProvider = config.ownerProvider;
+  ownerProvider = options.ownerProvider;
 
   if (typeof ownerProvider === 'string') {
     ownerProvider = propertyOwnerProvider(ownerProvider);
@@ -58,10 +59,10 @@ function middlewareWrapper(beyo, config) {
     return function * (next) {
       var id;
 
-      if (config.url && (this.url === config.clientUrl)) {
+      if (options.clientUrl && (this.url === options.clientUrl)) {
         id = yield ownerProvider(this);
 
-        this.body = yield clientLibrary(id, config);
+        this.body = yield clientLibrary(id, options);
       } else {
         yield* next;
       }
@@ -127,22 +128,26 @@ function clientLibrary(id, options) {
       b.bundle().on('data', function (data) {
         buffer = buffer + data.toString();
       }).on('end', function () {
-        var ast = esprima.parse(buffer);
-        // Get optimized AST
-        var optimized = esmangle.optimize(ast, null);
-        // gets mangled AST
-        var result = esmangle.mangle(optimized);
-        // get source back
-        libraryTemplate = escodegen.generate(result, {
-          format: {
-            renumber: true,
-            hexadecimal: true,
-            escapeless: true,
-            compact: true,
-            semicolons: false,
-            parentheses: false
-          }
-        });
+        if (OPTIMIZE_CLIENT_LIBRARY) {
+          var ast = esprima.parse(buffer);
+          // Get optimized AST
+          var optimized = esmangle.optimize(ast, null);
+          // gets mangled AST
+          var result = esmangle.mangle(optimized);
+          // get source back
+          libraryTemplate = escodegen.generate(result, {
+            format: {
+              renumber: true,
+              hexadecimal: true,
+              escapeless: true,
+              compact: true,
+              semicolons: false,
+              parentheses: false
+            }
+          });
+        } else {
+          libraryTemplate = buffer;
+        }
 
         done(null, configClientLibrary(id, options));
       });
@@ -163,7 +168,8 @@ function configClientLibrary(id, options) {
   var pre = 'var rpcConfig=' + JSON.stringify({
               'owner': id,
               'primus-url': rpc.clientConnection.url,
-              'primus-options': options.primusOptions || {}
+              'primus-options': options.primusOptions || {},
+              'messageTimeout': options.messageTimeout || config.messageTimeout
             }) + ';'
   ;
 

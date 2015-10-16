@@ -11,6 +11,8 @@ In your application :
 npm install beyo-plugin-rpc --save
 ```
 
+**NOTE:** You'll also need a Promise/A+ implementation [polyfill](https://www.npmjs.com/package/promise-polyfill) in the browser. The client library does not provide one by default and leave this responsibility to the client.
+
 Then add the plugin configuration to your app `conf` :
 
 ```
@@ -25,8 +27,8 @@ Then add the plugin configuration to your app `conf` :
         "transformer": "websockets"
       },
       "ownerProvider": "passport.user.id",
-      "clientUrl": "/rpc/client.js"
-      }
+      "clientUrl": "/rpc/client.js",
+      "messageTimeout": 10000
     }
   }
 }
@@ -46,6 +48,7 @@ Since this is a plugin, the instance may be obtained only from `beyo.plugins`. T
 var rpc = beyo.plugins.rpc;
 ```
 
+**NOTE:** Obviously, you need the Beyo application instance, acquired from any loader function; module, controller, model, etc.
 
 ### Getting the Interface on the Client
 
@@ -68,16 +71,17 @@ require(['rpc/client'], function (rpc) {
 });
 ```
 
-**NOTE**: The client library uses [Primus](https://github.com/primus/primus) to communicate with the server. However, at the moment, there is no way to setup primus.
+**NOTE**: The client library uses [Primus](https://github.com/primus/primus) to communicate with the server. The communication with the server is specified automatically within the client library code.
 
 
 ## Configuration
 
 * **primusOptions** : *{object}* - *(required)* an object that will be passed to the Primus constructor. (See [documentation](https://github.com/primus/primus).)
-* **interface** : *{string}* - the network interface to use (i.e. `'eth0'`)
-* **useIPv6** : *{boolean}* - when determining the network interface IP address, should the address be resolved as IPv6 (`true`) or IPv4 (`false`)
-* **clientUrl** : *{string}* - the URL that the client will connect to to get the library. If not specified, then no client code will be served.
+* **interface** : *{string}* - the network interface to use (i.e. `'eth0'`) *(default `null`)*
+* **useIPv6** : *{boolean}* - when determining the network interface IP address, should the address be resolved as IPv6 (`true`) or IPv4 (`false`) *(default `false`)*
+* **clientUrl** : *{string}* - the URL that the client will connect to to get the library. If not specified, then no client code will be served. *(default `"/rpc/client.js"`)*
 * **ownerProvider** : *{function|string}* - how message and response owners are generated for clients. If a function, it will receive the HTTP request context object and should return an identifier or a `Promise` resolving to an identifier. If a string, it should represent a property path from the HTTP request context. If not specified, a unique hash value will be generated and returned.
+* **messageTimeout** : *{numeric}* - a value indicating how long a message can wait accross the network before timing out (in ms). *(default `10000`)*
   
   Example:
   ```
@@ -97,11 +101,11 @@ require(['rpc/client'], function (rpc) {
 
 ### API
 
-* **rpc.emit(name, data, target)** or **rpc.emit(message)** : *(Promise)* - emit some `data` to the specified `name`d listeners, and return a `Promise` resolving with the given values, or rejecting with the given `Error`s. If `target` is specified, it is a string or array of strings, which will emit to these specified targets only. If target is not specified, it will be emitted to all server and clients.
+* **rpc.emit(action, data, target)** or **rpc.emit(message)** : *(Promise)* - emit some `data` to the specified `action` listeners, and return a `Promise` resolving with the given responses as an array, or rejecting with the given `Error`s. If `target` is specified, it is a string or array of strings, which will emit to these specified targets only. If target is not specified, it will be emitted to all server and clients.
 
   ```
   var message = new rpc.Message('foo.bar', {
-    greeting: 'World'
+    greeting: 'Hello!'
   });
   rpc.emit(message).then(function (responses) {
     responses.forEach(function (response) {
@@ -116,13 +120,22 @@ require(['rpc/client'], function (rpc) {
   })
   ```
 
-  **NOTE**: on the client side, jQuery's promise implementation is used. Until version 3.0 of jQuery, the client-side promises will be "thenable", and not Promise/A+ compatible.
+  **NOTE:** You'll need a Promise/A+ implementation [polyfill](https://www.npmjs.com/package/promise-polyfill) in the browser. The client library does not provide one by default and leave this responsibility to the client.
 
-* *(server)* **rpc.library(id)** : *{GeneratorFunction}* - resolve with the client library as string. The argument `id` should be an library's unique id when connecting to the server. This function will generate a personalized client library. Therefore, it's returned value must not be cached globally. The first time this function is called may require some time to process. However, any subsequent call returns almost immediately as the generic part of the library is cached internally (~30KB)
+  **NOTE:** Only listeners returning a value will be listed in the responses array.
 
-* *(server)* **rpc.middleware()** : *{function}* - return a middleware to handle retrieving the client library from the configured url.
+  **NOTE:** Errors within listeners should be caught and returned, otherwise
+  the other end will most likely only timeout.
 
-* **rpc.on(name, callback)** or **rpc.on(obj)** : *(Promise)* - register a new message handler. The `name` is an arbitrary string value. If an `object` is passed, then it's nested keys will be used as names. The `callback` argument, or `obj` values, should be functions receiving a `Message` object and returning or a value (sync), or a `Promise` (async).
+  **NOTE:** Listeners should return a response otherwise a timeout will be issued. The `Promise` will resolve *only* when all listeners resolve or timeout.
+
+* *(server)* **rpc.library(id)** : *{GeneratorFunction}* - resolve with the client library as string. The argument `id` should be an library's unique id when connecting to the server. This function will generate a personalized client library. Therefore, it's returned value must not be cached globally. The first time this function is called may require some time to process. However, any subsequent call returns almost immediately as the generic part of the library is cached internally (~40KB)
+
+* *(server)* **rpc.middleware()** : *{function}* - return a middleware to handle retrieving the client library from the configured url, using the option `ownerProvider` value to generate the library `id`.
+
+* **rpc.on(action, listener)** or **rpc.on(obj)** : *(Promise)* - register a new message handler. The `action` is an arbitrary string value. If an `object` is passed, then it's nested keys will be used as names. The `listener` argument, or `obj` values, should be functions receiving a `Message` object and returning or a value (sync), or a `Promise` (async).
+
+  **NOTE:** The listener should return or resolve a value before the other end's time out.
  
   ```
   rpc.on('foo.bar', function (msg) {
